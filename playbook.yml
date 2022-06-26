@@ -1,0 +1,93 @@
+---
+- hosts: webservers
+  roles:
+    - role: '{{ playbook_dir }}'
+  
+  tasks:
+    - name: Install curl & git packages
+      become: yes
+      apt:
+        name: 
+          - curl
+          - git
+        update_cache: yes
+      
+      # In case you want to skip or play only this specific task  
+      tags:
+        - curl
+      
+    - name: Download NodeJS 14.X Source
+      become: yes
+      shell: curl -sL https://deb.nodesource.com/setup_14.x | sudo bash -
+      
+    - name: Install NodeJS 
+      become: yes
+      apt:
+        name: nodejs
+        state: present
+      
+      # In case you want to skip or play only this specific task  
+      tags:
+         - package
+    
+    - name: Clone the Webapp repo from github
+      ansible.builtin.git:
+        repo: https://github.com/GShwartz/bootcamp-app.git
+        dest: ~/bootcamp-app/
+        clone: yes
+        update: yes
+    
+      # In case you want to skip or play only this specific task  
+      tags:
+         - clone
+         
+    - name: Copy ENV file to bootcamp-app
+      ansible.builtin.copy:
+        # The env var comes from the fresh.sh script
+        src: ./{{ env }}
+        dest: ~/bootcamp-app/.env
+        follow: no
+      
+      # In case you want to skip or play only this specific task  
+      tags:
+         - envcopy
+  
+    - name: Creates an entry in crontab
+      ansible.builtin.cron:
+        name: "run webapp"
+        special_time: reboot
+        job: "cd ~/bootcamp-app/ && npm run dev"
+    
+      # In case you want to skip or play only this specific task  
+      tags:
+         - cron
+         
+    # Install Webapp package with NodeJS
+    - name: Install WebApp JS Package
+      ansible.builtin.shell: 
+        chdir: ~/bootcamp-app/
+        cmd: npm install
+      
+      # In case you want to skip or play only this specific task  
+      tags:
+         - npminstall
+        
+    # Sync & Init app with DB
+    - name: Initalize App's Database
+      ansible.builtin.shell: 
+        chdir: ~/bootcamp-app/
+        cmd: npm run initdb
+      
+      # In case you want to skip or play only this specific task  
+      tags:
+         - initdb
+         
+    - name: Reboot remote servers
+      become: yes
+      ansible.builtin.reboot:
+        msg: "Reboot by Ansible"
+        pre_reboot_delay: 2
+        
+      # In case you want to skip or play only this specific task  
+      tags:
+         - reboot
